@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { 
   History, 
@@ -35,14 +35,30 @@ interface Lead {
 
 export default function SearchHistory() {
   const { token, user } = useAuth();
+  const navigate = useNavigate();
   const [history, setHistory] = useState<SearchEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedSearch, setSelectedSearch] = useState<SearchEntry | null>(null);
 
   useEffect(() => {
+    if (user) {
+      const isAdmin = user.role === "admin";
+      const isProspector = user.sector === "Prospecção";
+      const hasAiPermission = user.can_use_ai_search === 1;
+
+      if (!isAdmin && !isProspector) {
+        navigate("/sites");
+        return;
+      }
+
+      if (!isAdmin && !hasAiPermission) {
+        navigate("/create");
+        return;
+      }
+    }
     fetchHistory();
-  }, []);
+  }, [user, navigate]);
 
   const fetchHistory = async () => {
     setIsLoading(true);

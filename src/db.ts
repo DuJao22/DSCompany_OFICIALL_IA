@@ -81,7 +81,8 @@ class DBWrapper {
           daily_goal INTEGER DEFAULT 0,
           sector TEXT,
           gemini_api_key TEXT,
-          sales_message_template TEXT
+          sales_message_template TEXT,
+          can_use_ai_search INTEGER DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS sites (
@@ -149,7 +150,8 @@ class DBWrapper {
         { name: 'daily_goal', type: 'INTEGER DEFAULT 0' },
         { name: 'sector', type: 'TEXT' },
         { name: 'gemini_api_key', type: 'TEXT' },
-        { name: 'sales_message_template', type: 'TEXT' }
+        { name: 'sales_message_template', type: 'TEXT' },
+        { name: 'can_use_ai_search', type: 'INTEGER DEFAULT 0' }
       ]);
 
       addColumnsIfMissing('sites', [

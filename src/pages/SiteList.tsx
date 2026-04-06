@@ -243,7 +243,7 @@ export default function SiteList() {
 
   const [showFlowJson, setShowFlowJson] = useState(false);
   const [generatedFlowJson, setGeneratedFlowJson] = useState<any>(null);
-  const [payloadType, setPayloadType] = useState<"flow" | "data" | "site">("site");
+  const [payloadType, setPayloadType] = useState<"flow" | "data">("flow");
   const [isGeneratingSite, setIsGeneratingSite] = useState(false);
 
   const handleUpdateStatus = async (id: number, newStatus: string, hosting_url?: string) => {
@@ -408,48 +408,7 @@ export default function SiteList() {
 
       let finalPayload: any = null;
 
-      if (payloadType === "site") {
-        if (!apiKey) {
-          addLog("Erro: Chave de API do Gemini não configurada. Configure nas Configurações.", "error");
-          setIsSending(false);
-          return;
-        }
-
-        addLog("Gerando HTML do site via Gemini IA...", "info");
-        setIsGeneratingSite(true);
-        
-        const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || (templates.length > 0 ? templates[0] : null);
-        const promptText = selectedTemplate 
-          ? generatePromptWithTemplate(data, endpointModal.site.map_link || "", selectedTemplate.prompt_template)
-          : generatePrompt(data, endpointModal.site.map_link || "");
-
-        try {
-          const ai = new GoogleGenAI({ apiKey });
-          const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [{ parts: [{ text: promptText }] }],
-            config: {
-              systemInstruction: "Você é um gerador de código HTML puro. Retorne APENAS o código HTML completo, começando com <!DOCTYPE html> e terminando com </html>. NÃO use markdown. NÃO escreva nenhuma introdução, explicação ou comentário fora das tags HTML."
-            }
-          });
-
-          const html = response.text || "";
-          
-          if (!html) throw new Error("Gemini retornou HTML vazio");
-          
-          finalPayload = {
-            name: endpointModal.site.name,
-            html: html.replace(/```html/g, '').replace(/```/g, '').trim()
-          };
-          addLog("HTML gerado com sucesso pela IA.", "success");
-        } catch (err: any) {
-          addLog(`Erro ao gerar HTML: ${err.message}`, "error");
-          setIsSending(false);
-          setIsGeneratingSite(false);
-          return;
-        }
-        setIsGeneratingSite(false);
-      } else if (payloadType === "flow") {
+      if (payloadType === "flow") {
         addLog("Gerando JSON do Fluxo...", "info");
         const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || (templates.length > 0 ? templates[0] : null);
         const promptText = selectedTemplate 
@@ -472,23 +431,17 @@ export default function SiteList() {
       }
 
       const payloadLabel =
-        payloadType === "flow" ? "JSON do Fluxo" : 
-        payloadType === "site" ? "Site Pronto (HTML)" : "Dados da Análise";
+        payloadType === "flow" ? "JSON do Fluxo" : "Dados da Análise";
 
       addLog(
         `Enviando ${payloadLabel} para o endpoint: ${endpointUrl}...`,
         "info",
       );
       
-      // Don't log the full HTML if it's a site payload to keep logs readable
-      if (payloadType === "site") {
-        addLog(`Payload: { name: "${finalPayload.name}", html: "... [HTML Gerado] ..." }`, "info");
-      } else {
-        addLog(
-          `Payload que será enviado:\n${JSON.stringify(finalPayload, null, 2)}`,
-          "info"
-        );
-      }
+      addLog(
+        `Payload que será enviado:\n${JSON.stringify(finalPayload, null, 2)}`,
+        "info"
+      );
       const endpointRes = await fetch("/api/proxy-webhook", {
         method: "POST",
         headers: {
@@ -515,7 +468,6 @@ export default function SiteList() {
           setEndpointResult({ success: true });
           const successMsg = 
             payloadType === "flow" ? "JSON do Fluxo enviado com sucesso." :
-            payloadType === "site" ? "Site (HTML) enviado com sucesso." :
             "Dados enviados com sucesso.";
             
           addLog(successMsg, "success");
@@ -899,7 +851,7 @@ export default function SiteList() {
                   <label className="block text-sm font-medium text-zinc-900 mb-2">
                     Tipo de Dados para Enviar
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setPayloadType("flow")}
@@ -907,14 +859,6 @@ export default function SiteList() {
                     >
                       <FileJson className="w-5 h-5 mb-1" />
                       <span className="text-[10px] font-bold">Fluxo JSON</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPayloadType("site")}
-                      className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all ${payloadType === "site" ? "border-emerald-600 bg-emerald-50 text-emerald-700" : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300"}`}
-                    >
-                      <Sparkles className="w-5 h-5 mb-1" />
-                      <span className="text-[10px] font-bold">Site (HTML)</span>
                     </button>
                     <button
                       type="button"

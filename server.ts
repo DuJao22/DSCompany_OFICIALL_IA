@@ -136,7 +136,7 @@ app.post('/api/auth/change-password', authenticateToken, async (req: any, res) =
 // Get current user
 app.get('/api/auth/me', authenticateToken, async (req: any, res) => {
   try {
-    const results = await db.sql`SELECT id, username, role, api_key, daily_goal, sector, gemini_api_key, sales_message_template FROM users WHERE id = ${req.user.id}`;
+    const results = await db.sql`SELECT id, username, role, api_key, daily_goal, sector, gemini_api_key, sales_message_template, can_use_ai_search FROM users WHERE id = ${req.user.id}`;
     const user = results[0];
     res.json(user);
   } catch (error) {
@@ -186,7 +186,7 @@ app.get('/api/users', authenticateToken, async (req: any, res) => {
     return res.status(403).json({ error: 'Acesso negado' });
   }
   try {
-    const users = await db.sql`SELECT id, username, role, api_key, daily_goal, sector FROM users`;
+    const users = await db.sql`SELECT id, username, role, api_key, daily_goal, sector, can_use_ai_search FROM users`;
     res.json(users);
   } catch (error) {
     console.error('Users fetch error:', error);
@@ -198,7 +198,7 @@ app.post('/api/users', authenticateToken, async (req: any, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso negado' });
   }
-  const { username, password, role, daily_goal, sector } = req.body;
+  const { username, password, role, daily_goal, sector, can_use_ai_search } = req.body;
   if (!username || !password || !role) {
     return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
   }
@@ -213,8 +213,9 @@ app.post('/api/users', authenticateToken, async (req: any, res) => {
     const apiKey = crypto.randomBytes(24).toString('hex');
     const goal = parseInt(daily_goal) || 0;
     const sectorStr = String(sector || '');
+    const canUseAi = can_use_ai_search ? 1 : 0;
     
-    await db.sql`INSERT INTO users (username, password_hash, role, api_key, daily_goal, sector) VALUES (${username}, ${hash}, ${role}, ${apiKey}, ${goal}, ${sectorStr})`;
+    await db.sql`INSERT INTO users (username, password_hash, role, api_key, daily_goal, sector, can_use_ai_search) VALUES (${username}, ${hash}, ${role}, ${apiKey}, ${goal}, ${sectorStr}, ${canUseAi})`;
     
     res.json({ success: true });
   } catch (error) {
@@ -227,7 +228,7 @@ app.patch('/api/users/:id', authenticateToken, async (req: any, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Acesso negado' });
   }
-  const { daily_goal, sector, role } = req.body;
+  const { daily_goal, sector, role, can_use_ai_search } = req.body;
   
   try {
     if (daily_goal !== undefined) {
@@ -239,6 +240,12 @@ app.patch('/api/users/:id', authenticateToken, async (req: any, res) => {
     if (role !== undefined) {
       await db.sql`UPDATE users SET role = ${String(role)} WHERE id = ${req.params.id}`;
     }
+    if (can_use_ai_search !== undefined) {
+      await db.sql`UPDATE users SET can_use_ai_search = ${can_use_ai_search ? 1 : 0} WHERE id = ${req.params.id}`;
+    }
+    
+    // Clear cache for this user
+    userCache.delete(parseInt(req.params.id));
     
     res.json({ success: true });
   } catch (error) {

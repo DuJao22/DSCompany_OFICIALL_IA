@@ -39,8 +39,20 @@ export default function LeadGenerator() {
   const [apiKey, setApiKey] = useState("");
 
   useEffect(() => {
-    if (user && user.role !== "admin" && user.sector !== "Prospecção") {
-      navigate("/sites");
+    if (user) {
+      const isAdmin = user.role === "admin";
+      const isProspector = user.sector === "Prospecção";
+      const hasAiPermission = user.can_use_ai_search === 1;
+
+      if (!isAdmin && !isProspector) {
+        navigate("/sites");
+        return;
+      }
+
+      if (!isAdmin && !hasAiPermission) {
+        navigate("/create"); // Redirect to manual search if no AI permission
+        return;
+      }
     }
     fetchApiKey();
   }, [user, navigate]);

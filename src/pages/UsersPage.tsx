@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { Users, Plus, Trash2, Key, Copy, CheckCircle } from "lucide-react";
+import { Users, Plus, Trash2, Key, Copy, CheckCircle, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function UsersPage() {
@@ -13,6 +13,7 @@ export default function UsersPage() {
   const [newPassword, setNewPassword] = useState("12345");
   const [newUserType, setNewUserType] = useState("Prospecção");
   const [newGoal, setNewGoal] = useState("0");
+  const [newCanUseAi, setNewCanUseAi] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export default function UsersPage() {
           role: newUserType === "Admin Geral" ? "admin" : "user",
           daily_goal: newGoal,
           sector: newUserType === "Admin Geral" ? "" : newUserType,
+          can_use_ai_search: newCanUseAi ? 1 : 0
         }),
       });
       if (res.status === 401 || res.status === 403) {
@@ -72,6 +74,7 @@ export default function UsersPage() {
         setNewPassword("12345");
         setNewUserType("Prospecção");
         setNewGoal("0");
+        setNewCanUseAi(false);
         setIsCreating(false);
         setSuccess("Usuário criado com sucesso!");
         fetchUsers();
@@ -157,6 +160,29 @@ export default function UsersPage() {
       }
     } catch (error) {
       console.error("Error updating sector:", error);
+    }
+  };
+
+  const handleToggleAiSearch = async (id: number, currentStatus: number) => {
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ can_use_ai_search: currentStatus === 1 ? 0 : 1 }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        logout();
+        navigate("/login");
+        return;
+      }
+      if (res.ok) {
+        fetchUsers();
+      }
+    } catch (error) {
+      console.error("Error toggling AI search:", error);
     }
   };
 
@@ -264,6 +290,18 @@ export default function UsersPage() {
                 className="mt-1 block w-full border border-zinc-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm"
               />
             </div>
+            <div className="flex items-center gap-2 pb-2">
+              <input
+                type="checkbox"
+                id="can_use_ai"
+                checked={newCanUseAi}
+                onChange={(e) => setNewCanUseAi(e.target.checked)}
+                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-zinc-300 rounded"
+              />
+              <label htmlFor="can_use_ai" className="text-sm font-medium text-zinc-700 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-emerald-500" /> Busca IA
+              </label>
+            </div>
             <button
               type="submit"
               className="w-full sm:w-auto inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500"
@@ -362,6 +400,21 @@ export default function UsersPage() {
                         <option value="Vendas">Vendas</option>
                         <option value="Admin Geral">Admin Geral</option>
                       </select>
+                      
+                      <button
+                        onClick={() => handleToggleAiSearch(u.id, u.can_use_ai_search)}
+                        className={`ml-4 flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold transition-all ${
+                          u.can_use_ai_search === 1 
+                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                            : 'bg-zinc-100 text-zinc-500 border border-zinc-200'
+                        }`}
+                      >
+                        {u.can_use_ai_search === 1 ? (
+                          <><ShieldCheck className="w-3 h-3" /> Busca IA Ativa</>
+                        ) : (
+                          <><ShieldAlert className="w-3 h-3" /> Busca IA Inativa</>
+                        )}
+                      </button>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">

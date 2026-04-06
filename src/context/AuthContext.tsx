@@ -8,6 +8,7 @@ interface User {
   sector?: string;
   gemini_api_key?: string;
   sales_message_template?: string;
+  can_use_ai_search?: number;
 }
 
 interface AuthContextType {
