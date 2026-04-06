@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, PlusCircle, List, LogOut, Menu, X, Building2, Settings, Code, Users, Layout, Sparkles } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, List, LogOut, Menu, X, Building2, Settings, Code, Users, Layout, Sparkles, History } from 'lucide-react';
 
 export default function DashboardLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -25,6 +25,7 @@ export default function DashboardLayout() {
   if (user?.role === 'admin' || user?.sector === 'Prospecção') {
     navigation.splice(1, 0, { name: 'Nova Análise', href: '/create', icon: PlusCircle });
     navigation.splice(2, 0, { name: 'Gerador de Leads', href: '/leads', icon: Sparkles });
+    navigation.splice(3, 0, { name: 'Histórico de Buscas', href: '/leads/history', icon: History });
   }
 
   if (user?.role === 'admin' || user?.sector === 'Produção') {

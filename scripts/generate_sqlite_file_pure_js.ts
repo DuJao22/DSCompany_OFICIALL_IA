@@ -6,7 +6,7 @@ import path from 'path';
 async function generateSqliteFile() {
   console.log('Starting SQLite file generation from JSON export...');
   const inputPath = path.join(process.cwd(), 'database_export.json');
-  const outputPath = path.join(process.cwd(), 'database.sqlite');
+  const outputPath = path.join(process.cwd(), 'database_export.sqlite');
   
   if (!fs.existsSync(inputPath)) {
     console.error('Error: database_export.json not found. Please run export_db.ts first.');

@@ -12,6 +12,7 @@ import UsersPage from './pages/UsersPage';
 import TemplatesPage from './pages/TemplatesPage';
 import ProfilePage from './pages/ProfilePage';
 import LeadGenerator from './pages/LeadGenerator';
+import SearchHistory from './pages/SearchHistory';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="leads" element={<LeadGenerator />} />
+            <Route path="leads/history" element={<SearchHistory />} />
           </Route>
         </Routes>
       </BrowserRouter>

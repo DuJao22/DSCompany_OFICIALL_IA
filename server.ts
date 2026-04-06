@@ -1,4 +1,5 @@
 import express from 'express';
+console.log('Server starting...');
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
@@ -487,6 +488,92 @@ app.post('/api/analyze/save', authenticateToken, async (req: any, res) => {
   } catch (dbErr: any) {
     console.error('Database error when saving site:', dbErr);
     return res.status(500).json({ error: 'Erro no banco de dados ao salvar: ' + dbErr.message });
+  }
+});
+
+// Bulk Save Leads
+app.post('/api/analyze/bulk-save', authenticateToken, async (req: any, res) => {
+  const { leads } = req.body;
+  if (!Array.isArray(leads)) {
+    return res.status(400).json({ error: 'Leads deve ser um array' });
+  }
+
+  const results = [];
+  const errors = [];
+
+  for (const lead of leads) {
+    try {
+      const safeName = lead.name ? lead.name.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/(^_|_$)+/g, '') : 'empresa';
+      const timestamp = Date.now() + Math.floor(Math.random() * 1000);
+      const filename = `${safeName}_${timestamp}.json`;
+      const filepath = path.join(dadosDir, filename);
+
+      fs.writeFileSync(filepath, JSON.stringify(lead, null, 2));
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      const servicesStr = Array.isArray(lead.services) ? lead.services.join(', ') : (lead.services || '');
+      const nameStr = String(lead.name || 'Desconhecido');
+      const phoneStr = String(lead.phone || '');
+      const addressStr = String(lead.address || '');
+      const cityStr = String(lead.city || '');
+      const descriptionStr = String(lead.description || '');
+      const mapLinkStr = String(lead.maps_link || lead.map_link || '');
+      const imageUrlStr = String(lead.image_url || '');
+
+      const result = await db.sql`
+        INSERT INTO sites (slug, name, phone, address, city, description, services, map_link, image_url, expires_at, user_id, status, full_data)
+        VALUES (${filename}, ${nameStr}, ${phoneStr}, ${addressStr}, ${cityStr}, ${descriptionStr}, ${servicesStr}, ${mapLinkStr}, ${imageUrlStr}, ${expiresAt.toISOString()}, ${req.user.id}, 'prospectado', ${JSON.stringify(lead)})
+      `;
+      results.push({ id: result.lastID, name: lead.name });
+    } catch (err: any) {
+      console.error('Bulk save error for lead:', lead.name, err);
+      errors.push({ name: lead.name, error: err.message });
+    }
+  }
+
+  res.json({ success: true, results, errors });
+});
+
+// Save Search History
+app.post('/api/search-history', authenticateToken, async (req: any, res) => {
+  const { query, results_count, results_json } = req.body;
+  try {
+    await db.sql`
+      INSERT INTO search_history (user_id, query, results_count, results_json)
+      VALUES (${req.user.id}, ${query}, ${results_count}, ${JSON.stringify(results_json)})
+    `;
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error('Error saving search history:', error);
+    res.status(500).json({ error: 'Erro ao salvar histórico de busca' });
+  }
+});
+
+// List Search History
+app.get('/api/search-history', authenticateToken, async (req: any, res) => {
+  try {
+    const userRes = await db.sql`SELECT role FROM users WHERE id = ${req.user.id}`;
+    const user = userRes[0];
+    
+    let queryStr = `
+      SELECT sh.*, u.username 
+      FROM search_history sh 
+      JOIN users u ON sh.user_id = u.id
+    `;
+    
+    if (user.role !== 'admin') {
+      queryStr += ` WHERE sh.user_id = ${req.user.id}`;
+    }
+    
+    queryStr += ` ORDER BY sh.created_at DESC`;
+    
+    const history = await db.sql(queryStr);
+    res.json(history);
+  } catch (error: any) {
+    console.error('Error listing search history:', error);
+    res.status(500).json({ error: 'Erro ao listar histórico de busca' });
   }
 });
 
@@ -1024,7 +1111,7 @@ app.get('/api/admin/export-db', authenticateToken, async (req: any, res) => {
   let fileName = 'database_export.json';
   
   if (format === 'sqlite') {
-    fileName = 'database.sqlite';
+    fileName = 'database_export.sqlite';
   }
 
   const filePath = path.join(process.cwd(), fileName);
@@ -1039,26 +1126,29 @@ app.get('/api/admin/export-db', authenticateToken, async (req: any, res) => {
 export default app;
 
 // --- Local Development & Production Server ---
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  // Start Vite dev server
-  createViteServer({
-    server: { middlewareMode: true },
-    appType: 'spa',
-  }).then((vite) => {
-    app.use(vite.middlewares);
-    app.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on http://localhost:${PORT}`);
+const startServer = async () => {
+  if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    // Start Vite dev server
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
     });
-  });
-} else if (!process.env.VERCEL) {
-  // Serve static files in production (Render, Railway, VPS, etc.)
-  const distPath = path.join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-  
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-  });
-}
+    app.use(vite.middlewares);
+    console.log('Vite middleware integrated');
+  } else if (!process.env.VERCEL) {
+    // Serve static files in production (Render, Railway, VPS, etc.)
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  if (!process.env.VERCEL) {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || 'development'} mode)`);
+    });
+  }
+};
+
+startServer();

@@ -12,7 +12,8 @@ import {
   AlertCircle,
   ArrowRight,
   ExternalLink,
-  Copy
+  Copy,
+  History
 } from "lucide-react";
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -20,6 +21,7 @@ interface Lead {
   name: string;
   city: string;
   address: string;
+  phone: string;
   maps_link: string;
   niche: string;
   imported?: boolean;
@@ -31,6 +33,7 @@ export default function LeadGenerator() {
 
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [savingLeads, setSavingLeads] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -86,8 +89,9 @@ export default function LeadGenerator() {
         1. Nome do estabelecimento
         2. Cidade
         3. Endereço completo
-        4. Link do Google Maps (se possível, ou o nome exato para busca)
-        5. Nicho de atuação
+        4. Números de telefone (inclua todos os números encontrados, separados por vírgula. Se não encontrar nenhum, retorne uma string vazia)
+        5. Link do Google Maps (se possível, ou o nome exato para busca)
+        6. Nicho de atuação
         
         Retorne APENAS um JSON válido no seguinte formato:
         {
@@ -96,6 +100,7 @@ export default function LeadGenerator() {
               "name": "Nome",
               "city": "Cidade",
               "address": "Endereço",
+              "phone": "Telefone",
               "maps_link": "Link do Maps",
               "niche": "Nicho"
             }
@@ -115,10 +120,11 @@ export default function LeadGenerator() {
                     name: { type: Type.STRING },
                     city: { type: Type.STRING },
                     address: { type: Type.STRING },
+                    phone: { type: Type.STRING },
                     maps_link: { type: Type.STRING },
                     niche: { type: Type.STRING }
                   },
-                  required: ["name", "city", "address", "maps_link", "niche"]
+                  required: ["name", "city", "address", "phone", "maps_link", "niche"]
                 }
               }
             }
@@ -127,9 +133,48 @@ export default function LeadGenerator() {
       });
 
       const data = JSON.parse(response.text);
-      setLeads(data.leads || []);
+      const leadsFound = data.leads || [];
+      setLeads(leadsFound);
       
-      if (data.leads?.length === 0) {
+      // Save to history AND bulk save to sites (Automatic Import)
+      if (leadsFound.length > 0) {
+        try {
+          // 1. Save to history
+          await fetch("/api/search-history", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              query: query,
+              results_count: leadsFound.length,
+              results_json: data
+            }),
+          });
+
+          // 2. Bulk save to sites
+          setSavingLeads(true);
+          const bulkRes = await fetch("/api/analyze/bulk-save", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ leads: leadsFound }),
+          });
+          setSavingLeads(false);
+
+          if (bulkRes.ok) {
+            // Mark all as imported in UI
+            setLeads(leadsFound.map(l => ({ ...l, imported: true })));
+          }
+        } catch (err) {
+          console.error("Error in post-search processing:", err);
+        }
+      }
+      
+      if (leadsFound.length === 0) {
         setError("Nenhum lead encontrado para essa busca.");
       }
     } catch (err: any) {
@@ -165,7 +210,7 @@ export default function LeadGenerator() {
           niche: lead.niche,
           description: `Lead gerado automaticamente via IA para: ${lead.name}`,
           services: "Serviços a serem analisados",
-          phone: ""
+          phone: lead.phone
         }),
       });
 
@@ -189,7 +234,7 @@ export default function LeadGenerator() {
           <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
             <Sparkles className="w-6 h-6 text-emerald-600" />
           </div>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold text-zinc-900">Gerador de Leads por IA</h1>
             <p className="text-zinc-500">
               Encontre novos clientes automaticamente usando a inteligência do Google.
@@ -200,6 +245,12 @@ export default function LeadGenerator() {
               )}
             </p>
           </div>
+          <Link 
+            to="/leads/history" 
+            className="px-4 py-2 bg-zinc-100 text-zinc-600 font-semibold rounded-xl hover:bg-zinc-200 transition-all flex items-center gap-2"
+          >
+            <History className="w-4 h-4" /> Ver Histórico
+          </Link>
         </div>
 
         <form onSubmit={handleSearch} className="flex gap-3">
@@ -250,6 +301,13 @@ export default function LeadGenerator() {
             <p className="text-sm">{error}</p>
           </div>
         )}
+
+        {savingLeads && (
+          <div className="mt-4 p-4 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center gap-3 text-emerald-700">
+            <Loader2 className="w-5 h-5 animate-spin shrink-0" />
+            <p className="text-sm">Salvando todos os leads encontrados automaticamente no banco de dados...</p>
+          </div>
+        )}
       </div>
 
       {leads.length > 0 && (
@@ -280,6 +338,9 @@ export default function LeadGenerator() {
               </p>
 
               <div className="space-y-3 mb-6">
+                <div className="text-xs text-zinc-600">
+                  <span className="font-semibold text-zinc-900">Telefone:</span> {lead.phone || "Não disponível"}
+                </div>
                 <div className="text-xs text-zinc-600">
                   <span className="font-semibold text-zinc-900">Nicho:</span> {lead.niche}
                 </div>
