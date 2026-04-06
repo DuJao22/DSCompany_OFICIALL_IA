@@ -18,7 +18,7 @@ const userCache = new Map<string | number, { timestamp: number; exists: boolean;
 const USER_CACHE_TTL = 60 * 1000; // 1 minute
 
 const app = express();
-const PORT = 3000;
+const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(cors());
 app.use(express.json());
