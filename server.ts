@@ -161,9 +161,12 @@ app.get('/api/settings', authenticateToken, async (req: any, res) => {
     if (req.user.role !== 'admin' && userData.sector !== 'Produção') {
       if (userData.gemini_api_key) {
         settingsMap.gemini_api_key = userData.gemini_api_key;
-      } else {
-        settingsMap.gemini_api_key = ''; // Hide global key from regular users not in Produção
+      } else if (!settingsMap.gemini_api_key) {
+        settingsMap.gemini_api_key = ''; 
       }
+      // Note: If settingsMap.gemini_api_key was already set from the settings table, 
+      // and the user has no personal key, we keep the global one.
+      
       // Hide default_endpoint from regular users not in Produção
       delete settingsMap.default_endpoint;
     } else if (userData.gemini_api_key) {
@@ -175,8 +178,8 @@ app.get('/api/settings', authenticateToken, async (req: any, res) => {
 
     res.json(settingsMap);
   } catch (error) {
-    console.error('Settings error:', error);
-    res.status(500).json({ error: 'Erro interno no servidor' });
+    console.error('Settings error details:', error);
+    res.status(500).json({ error: 'Erro interno no servidor ao buscar configurações' });
   }
 });
 

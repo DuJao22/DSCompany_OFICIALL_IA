@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { Settings, Key, CheckCircle, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { GoogleGenAI } from "@google/genai";
 
 export default function SettingsPage() {
   const { token, user, logout } = useAuth();

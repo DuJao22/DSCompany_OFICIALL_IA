@@ -255,7 +255,8 @@ Sua missão é OBRIGATÓRIA:
 6. Crie uma DESCRIÇÃO detalhada do negócio.
 7. Liste os principais serviços oferecidos (ou que fazem sentido para o nicho), separados por vírgula.
 
-RETORNE APENAS UM JSON VÁLIDO com a seguinte estrutura exata (sem formatação markdown como \`\`\`json):
+RETORNE OS DADOS EM UM BLOCO DE CÓDIGO JSON com a seguinte estrutura exata:
+\`\`\`json
 {
   "success": true/false,
   "errorMessage": "mensagem de erro se success for false",
@@ -267,6 +268,7 @@ RETORNE APENAS UM JSON VÁLIDO com a seguinte estrutura exata (sem formatação 
   "services": "Serviços",
   "niche": "Nicho"
 }
+\`\`\`
 
 NÃO INVENTE DADOS. Se não souber ou não encontrar o local exato, retorne success: false.`,
           config: {
@@ -295,8 +297,9 @@ NÃO INVENTE DADOS. Se não souber ou não encontrar o local exato, retorne succ
 
         if (responseText) {
           try {
-            // Remove markdown formatting if present
-            const cleanText = responseText
+            // Extract JSON from code block if present
+            const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) || responseText.match(/```([\s\S]*?)```/);
+            const cleanText = jsonMatch ? jsonMatch[1] : responseText
               .replace(/```json/gi, "")
               .replace(/```/g, "")
               .trim();

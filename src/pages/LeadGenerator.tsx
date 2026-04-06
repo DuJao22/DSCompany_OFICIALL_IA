@@ -115,7 +115,8 @@ IMPORTANTE:
 - Extraia o nome, cidade, endereço completo, telefone e link do Maps.
 - Se não encontrar o telefone, deixe em branco, mas tente ao máximo encontrar dados reais.
 
-Retorne APENAS um JSON válido no seguinte formato:
+Retorne os dados em um bloco de código JSON no seguinte formato:
+\`\`\`json
 {
   "leads": [
     {
@@ -127,34 +128,21 @@ Retorne APENAS um JSON válido no seguinte formato:
       "niche": "Nicho específico"
     }
   ]
-}`,
+}
+\`\`\``,
         config: {
           tools: [{ googleMaps: {} }],
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              leads: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    city: { type: Type.STRING },
-                    address: { type: Type.STRING },
-                    phone: { type: Type.STRING },
-                    maps_link: { type: Type.STRING },
-                    niche: { type: Type.STRING }
-                  },
-                  required: ["name", "city", "address", "phone", "maps_link", "niche"]
-                }
-              }
-            }
-          }
         },
       });
 
-      const data = JSON.parse(response.text);
+      let text = response.text || "";
+      // Extract JSON from code block if present
+      const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/```([\s\S]*?)```/);
+      if (jsonMatch) {
+        text = jsonMatch[1];
+      }
+
+      const data = JSON.parse(text);
       const leadsFound = data.leads || [];
       setLeads(leadsFound);
       
