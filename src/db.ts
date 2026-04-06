@@ -42,6 +42,7 @@ class DBWrapper {
                      trimmedQuery.startsWith('EXPLAIN');
 
     try {
+      console.log('Executing query:', query, 'with params:', params);
       if (isSelect) {
         const rows = this.db.prepare(query).all(...params);
         return rows;
@@ -50,7 +51,7 @@ class DBWrapper {
         return { lastID: info.lastInsertRowid, changes: info.changes };
       }
     } catch (err: any) {
-      console.error('Local SQLite Error:', err.message, 'Query:', query);
+      console.error('Local SQLite Error:', err.message, 'Query:', query, 'Params:', params);
       throw err;
     }
   }

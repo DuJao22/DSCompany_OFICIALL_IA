@@ -94,18 +94,27 @@ const authenticateToken = (req: any, res: any, next: any) => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { username, password } = req.body;
+    console.log('Login attempt for:', username);
     const results = await db.sql`SELECT * FROM users WHERE LOWER(username) = LOWER(${username})`;
     const user = results[0];
 
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    if (!user) {
+      console.log('User not found:', username);
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
+    if (!bcrypt.compareSync(password, user.password_hash)) {
+      console.log('Password mismatch for:', username);
+      return res.status(401).json({ error: 'Credenciais inválidas' });
+    }
+
+    console.log('Login successful for:', username);
+    console.log('JWT_SECRET length:', JWT_SECRET.length);
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role, sector: user.sector }, JWT_SECRET, { expiresIn: '24h' });
     res.json({ token, user: { id: user.id, username: user.username, role: user.role, api_key: user.api_key, sector: user.sector } });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ error: 'Erro interno no servidor' });
+  } catch (error: any) {
+    console.error('Login error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Erro interno no servidor: ' + error.message });
   }
 });
 
