@@ -1,9 +1,7 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { Database } from '@sqlitecloud/drivers';
 import crypto from 'crypto';
 
-const dbPath = path.join(process.cwd(), 'database.sqlite');
+const SQLITE_CLOUD_URL = process.env.SQLITE_CLOUD_URL || 'sqlitecloud://ct9xsnnpvz.g1.sqlite.cloud:8860/DsCompany_com_IA.db?apikey=c9lGTn4sb98t3kl3w2gU8cMXQiKDavSd7QF3vTwHV9Q';
 
 class DBWrapper {
   private db: any;
@@ -11,56 +9,38 @@ class DBWrapper {
 
   constructor() {
     try {
-      console.log('Opening local SQLite database with better-sqlite3 at:', dbPath);
-      this.db = new Database(dbPath);
-      console.log('Connected to local SQLite database.');
+      console.log('Connecting to SQLiteCloud...');
+      this.db = new Database(SQLITE_CLOUD_URL);
+      console.log('Connected to SQLiteCloud.');
       this.initializeSchema();
     } catch (err) {
-      console.error('Error opening local SQLite database:', err);
+      console.error('Error connecting to SQLiteCloud:', err);
     }
   }
 
   async sql(strings: TemplateStringsArray | string, ...values: any[]): Promise<any> {
-    let query: string;
-    let params: any[];
-
-    if (typeof strings === 'string') {
-      query = strings;
-      params = values;
-    } else {
-      query = strings.reduce((acc, str, i) => acc + str + (i < values.length ? '?' : ''), '');
-      params = values;
-    }
-
-    const trimmedQuery = query.trim().toUpperCase();
-    
-    // Detection for queries that return rows
-    const isSelect = trimmedQuery.startsWith('SELECT') || 
-                     trimmedQuery.startsWith('PRAGMA') || 
-                     trimmedQuery.startsWith('WITH') ||
-                     trimmedQuery.startsWith('SHOW') ||
-                     trimmedQuery.startsWith('EXPLAIN');
-
     try {
-      if (isSelect) {
-        const rows = this.db.prepare(query).all(...params);
-        return rows;
+      if (typeof strings === 'string') {
+        // Handle raw string queries
+        return await this.db.sql(strings, ...values);
       } else {
-        const info = this.db.prepare(query).run(...params);
-        return { lastID: info.lastInsertRowid, changes: info.changes };
+        // Handle tagged template queries
+        return await this.db.sql(strings, ...values);
       }
     } catch (err: any) {
-      console.error('Local SQLite Error:', err.message, 'Query:', query);
+      console.error('SQLiteCloud Error:', err.message);
       throw err;
     }
   }
 
   async close() {
     try {
-      this.db.close();
-      console.log('Local SQLite database connection closed.');
+      // SQLiteCloud driver might not have a close method or it might be different
+      // but let's try if it exists
+      if (this.db.close) await this.db.close();
+      console.log('SQLiteCloud database connection closed.');
     } catch (err) {
-      console.error('Error closing local SQLite database:', err);
+      console.error('Error closing SQLiteCloud database:', err);
     }
   }
 
@@ -68,10 +48,9 @@ class DBWrapper {
     if (this.isInitialized) return;
     
     try {
-      console.log('Initializing local SQLite schema...');
+      console.log('Initializing SQLiteCloud schema...');
       
-      // better-sqlite3 is synchronous, but we use async/await for consistency
-      this.db.exec(`
+      await this.db.sql(`
         CREATE TABLE IF NOT EXISTS users (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           username TEXT UNIQUE NOT NULL,
@@ -130,14 +109,14 @@ class DBWrapper {
       `);
 
       // Migration check for missing columns
-      const addColumnsIfMissing = (table: string, columnsToAdd: { name: string, type: string }[]) => {
+      const addColumnsIfMissing = async (table: string, columnsToAdd: { name: string, type: string }[]) => {
         try {
-          const columns: any = this.db.prepare(`PRAGMA table_info(${table})`).all();
+          const columns: any = await this.db.sql(`PRAGMA table_info(${table})`);
           const existingNames = columns.map((c: any) => c.name);
           
           for (const col of columnsToAdd) {
             if (!existingNames.includes(col.name)) {
-              this.db.exec(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type}`);
+              await this.db.sql(`ALTER TABLE ${table} ADD COLUMN ${col.name} ${col.type}`);
               console.log(`Added column ${col.name} to ${table}`);
             }
           }
@@ -146,7 +125,7 @@ class DBWrapper {
         }
       };
 
-      addColumnsIfMissing('users', [
+      await addColumnsIfMissing('users', [
         { name: 'daily_goal', type: 'INTEGER DEFAULT 0' },
         { name: 'sector', type: 'TEXT' },
         { name: 'gemini_api_key', type: 'TEXT' },
@@ -154,15 +133,16 @@ class DBWrapper {
         { name: 'can_use_ai_search', type: 'INTEGER DEFAULT 0' }
       ]);
 
-      addColumnsIfMissing('sites', [
+      await addColumnsIfMissing('sites', [
         { name: 'full_data', type: 'TEXT' },
         { name: 'hosting_url', type: 'TEXT' }
       ]);
 
       // Insert default templates if none exist
-      const templatesCount: any = this.db.prepare(`SELECT COUNT(*) as count FROM templates`).get();
+      const templatesCountRes: any = await this.db.sql(`SELECT COUNT(*) as count FROM templates`);
+      const templatesCount = templatesCountRes[0]?.count || 0;
       
-      if (templatesCount.count === 0) {
+      if (templatesCount === 0) {
         console.log('Inserting default templates...');
         const instagramCTA = `
 <footer style="position:relative;background:#040d1a;width:100%;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:40px 24px 48px;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif;">
@@ -273,21 +253,21 @@ ${instagramCTA}
           ]
         });
 
-        this.db.prepare(`INSERT INTO templates (name, prompt_template, flow_structure) VALUES (?, ?, ?)`).run('Modelo Rústico Padrão', defaultPrompt, defaultFlow);
-        this.db.prepare(`INSERT INTO templates (name, prompt_template, flow_structure) VALUES (?, ?, ?)`).run('Modelo Moderno Tech', defaultPrompt.replace('rústico', 'moderno'), defaultFlow);
+        await this.db.sql(`INSERT INTO templates (name, prompt_template, flow_structure) VALUES (?, ?, ?)`, 'Modelo Rústico Padrão', defaultPrompt, defaultFlow);
+        await this.db.sql(`INSERT INTO templates (name, prompt_template, flow_structure) VALUES (?, ?, ?)`, 'Modelo Moderno Tech', defaultPrompt.replace('rústico', 'moderno'), defaultFlow);
       }
 
       // Generate API keys for users that don't have one
-      const usersWithoutApiKey: any = this.db.prepare(`SELECT id FROM users WHERE api_key IS NULL`).all();
+      const usersWithoutApiKey: any = await this.db.sql(`SELECT id FROM users WHERE api_key IS NULL`);
       for (const user of usersWithoutApiKey) {
         const apiKey = crypto.randomBytes(24).toString('hex');
-        this.db.prepare(`UPDATE users SET api_key = ? WHERE id = ?`).run(apiKey, user.id);
+        await this.db.sql(`UPDATE users SET api_key = ? WHERE id = ?`, apiKey, user.id);
       }
       
       this.isInitialized = true;
-      console.log('Local SQLite schema initialization complete.');
+      console.log('SQLiteCloud schema initialization complete.');
     } catch (error) {
-      console.error('Error initializing local SQLite schema:', error);
+      console.error('Error initializing SQLiteCloud schema:', error);
     }
   }
 }
@@ -295,13 +275,13 @@ ${instagramCTA}
 const db = new DBWrapper();
 
 // Graceful shutdown
-process.on('SIGINT', () => {
-  db.close();
+process.on('SIGINT', async () => {
+  await db.close();
   process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-  db.close();
+process.on('SIGTERM', async () => {
+  await db.close();
   process.exit(0);
 });
 
