@@ -189,6 +189,7 @@ export default function SettingsPage() {
           )}
 
           <div className="space-y-6">
+            {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
               <div>
                 <h3 className="text-lg font-medium text-zinc-900 flex items-center gap-2 mb-2">
                   <Key className="w-5 h-5 text-emerald-600" />
@@ -270,6 +271,7 @@ export default function SettingsPage() {
                   </p>
                 </div>
               </div>
+            )}
 
             {(user?.role === "admin" || user?.sector === "Vendas") && (
               <div className="pt-6 border-t border-zinc-200">

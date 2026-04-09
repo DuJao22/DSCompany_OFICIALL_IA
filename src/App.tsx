@@ -21,6 +21,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function RequireAIPermission({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  if (isLoading) return <div className="min-h-screen flex items-center justify-center">Carregando...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin' && user.can_use_ai_search !== 1) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -34,15 +42,15 @@ export default function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Dashboard />} />
-            <Route path="create" element={<CreateSite />} />
+            <Route path="create" element={<RequireAIPermission><CreateSite /></RequireAIPermission>} />
             <Route path="sites" element={<SiteList />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="api-docs" element={<ApiDocs />} />
             <Route path="users" element={<UsersPage />} />
-            <Route path="templates" element={<TemplatesPage />} />
+            <Route path="templates" element={<RequireAIPermission><TemplatesPage /></RequireAIPermission>} />
             <Route path="profile" element={<ProfilePage />} />
-            <Route path="leads" element={<LeadGenerator />} />
-            <Route path="leads/history" element={<SearchHistory />} />
+            <Route path="leads" element={<RequireAIPermission><LeadGenerator /></RequireAIPermission>} />
+            <Route path="leads/history" element={<RequireAIPermission><SearchHistory /></RequireAIPermission>} />
           </Route>
         </Routes>
       </BrowserRouter>

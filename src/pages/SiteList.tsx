@@ -408,7 +408,10 @@ export default function SiteList() {
 
       let finalPayload: any = null;
 
-      if (payloadType === "flow") {
+      const hasAiPermission = user?.role === 'admin' || user?.can_use_ai_search === 1;
+      const actualPayloadType = (payloadType === "flow" && hasAiPermission) ? "flow" : "data";
+
+      if (actualPayloadType === "flow") {
         addLog("Gerando JSON do Fluxo...", "info");
         const selectedTemplate = templates.find(t => t.id === selectedTemplateId) || (templates.length > 0 ? templates[0] : null);
         const promptText = selectedTemplate 
@@ -431,7 +434,7 @@ export default function SiteList() {
       }
 
       const payloadLabel =
-        payloadType === "flow" ? "JSON do Fluxo" : "Dados da Análise";
+        actualPayloadType === "flow" ? "JSON do Fluxo" : "Dados da Análise";
 
       addLog(
         `Enviando ${payloadLabel} para o endpoint: ${endpointUrl}...`,
@@ -467,7 +470,7 @@ export default function SiteList() {
         if (resData.success) {
           setEndpointResult({ success: true });
           const successMsg = 
-            payloadType === "flow" ? "JSON do Fluxo enviado com sucesso." :
+            actualPayloadType === "flow" ? "JSON do Fluxo enviado com sucesso." :
             "Dados enviados com sucesso.";
             
           addLog(successMsg, "success");
@@ -852,14 +855,16 @@ export default function SiteList() {
                     Tipo de Dados para Enviar
                   </label>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPayloadType("flow")}
-                      className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all ${payloadType === "flow" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300"}`}
-                    >
-                      <FileJson className="w-5 h-5 mb-1" />
-                      <span className="text-[10px] font-bold">Fluxo JSON</span>
-                    </button>
+                    {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
+                      <button
+                        type="button"
+                        onClick={() => setPayloadType("flow")}
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl border-2 transition-all ${payloadType === "flow" ? "border-blue-600 bg-blue-50 text-blue-700" : "border-zinc-200 bg-white text-zinc-500 hover:border-zinc-300"}`}
+                      >
+                        <FileJson className="w-5 h-5 mb-1" />
+                        <span className="text-[10px] font-bold">Fluxo JSON</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setPayloadType("data")}
@@ -1249,14 +1254,16 @@ export default function SiteList() {
               <div>
                 <div className="flex justify-between items-center mb-1">
                   <label className="block text-sm font-medium text-zinc-700">Mensagem de Abordagem</label>
-                  <button
-                    onClick={() => handleGenerateAiMessage(salesMessageModal.site.id)}
-                    disabled={salesMessageModal.isGenerating}
-                    className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-2 py-1 rounded disabled:opacity-50"
-                  >
-                    <Sparkles className={`w-3 h-3 ${salesMessageModal.isGenerating ? 'animate-pulse' : ''}`} />
-                    {salesMessageModal.isGenerating ? 'Gerando...' : 'Melhorar com IA'}
-                  </button>
+                  {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
+                    <button
+                      onClick={() => handleGenerateAiMessage(salesMessageModal.site.id)}
+                      disabled={salesMessageModal.isGenerating}
+                      className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 bg-purple-50 px-2 py-1 rounded disabled:opacity-50"
+                    >
+                      <Sparkles className={`w-3 h-3 ${salesMessageModal.isGenerating ? 'animate-pulse' : ''}`} />
+                      {salesMessageModal.isGenerating ? 'Gerando...' : 'Melhorar com IA'}
+                    </button>
+                  )}
                 </div>
                 <textarea
                   value={salesMessageModal.message}
@@ -1289,7 +1296,7 @@ export default function SiteList() {
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-zinc-900">Análises Salvas</h1>
-        {(user?.role === 'admin' || user?.sector === 'Prospecção') && (
+        {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
           <Link
             to="/create"
             className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700"

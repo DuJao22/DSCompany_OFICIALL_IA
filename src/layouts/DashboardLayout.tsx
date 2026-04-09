@@ -42,19 +42,18 @@ export default function DashboardLayout() {
     { name: 'Configurações', href: '/settings', icon: Settings },
   ];
 
-  // Only Prospecção, Produção and Admin can create new analyses
-  if (user?.role === 'admin' || user?.sector === 'Prospecção') {
-    navigation.splice(1, 0, { name: 'Nova Análise', href: '/create', icon: PlusCircle });
-    
-    // AI search is only for admins or users with explicit permission
-    if (user?.role === 'admin' || user?.can_use_ai_search === 1) {
+  const hasAiPermission = user?.role === 'admin' || user?.can_use_ai_search === 1;
+
+  if (hasAiPermission) {
+    if (user?.role === 'admin' || user?.sector === 'Prospecção') {
+      navigation.splice(1, 0, { name: 'Nova Análise', href: '/create', icon: PlusCircle });
       navigation.splice(2, 0, { name: 'Gerador de Leads', href: '/leads', icon: Sparkles });
       navigation.splice(3, 0, { name: 'Histórico de Buscas', href: '/leads/history', icon: History });
     }
-  }
 
-  if (user?.role === 'admin' || user?.sector === 'Produção') {
-    navigation.push({ name: 'Templates', href: '/templates', icon: Layout });
+    if (user?.role === 'admin' || user?.sector === 'Produção') {
+      navigation.push({ name: 'Templates', href: '/templates', icon: Layout });
+    }
   }
 
   if (user?.role === 'admin') {

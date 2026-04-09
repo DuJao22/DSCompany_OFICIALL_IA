@@ -1,35 +1,56 @@
 import { Database } from '@sqlitecloud/drivers';
 import crypto from 'crypto';
+import 'dotenv/config';
 
 const SQLITE_CLOUD_URL = process.env.SQLITE_CLOUD_URL || 'sqlitecloud://ct9xsnnpvz.g1.sqlite.cloud:8860/DsCompany_com_IA.db?apikey=c9lGTn4sb98t3kl3w2gU8cMXQiKDavSd7QF3vTwHV9Q';
 
 class DBWrapper {
   private db: any;
   private isInitialized: boolean = false;
+  private readyPromise: Promise<void>;
 
   constructor() {
+    this.readyPromise = this.connect();
+  }
+
+  private async connect() {
     try {
-      console.log('Connecting to SQLiteCloud...');
+      const maskedUrl = SQLITE_CLOUD_URL.replace(/apikey=[^&]+/, 'apikey=***');
+      console.log(`Connecting to SQLiteCloud at ${maskedUrl}...`);
       this.db = new Database(SQLITE_CLOUD_URL);
-      console.log('Connected to SQLiteCloud.');
-      this.initializeSchema();
+      console.log('SQLiteCloud Database object created.');
+      await this.initializeSchema();
+      this.isInitialized = true;
+      console.log('SQLiteCloud DB is ready.');
     } catch (err) {
-      console.error('Error connecting to SQLiteCloud:', err);
+      console.error('CRITICAL: Error connecting to SQLiteCloud:', err);
+      throw err;
     }
   }
 
   async sql(strings: TemplateStringsArray | string, ...values: any[]): Promise<any> {
+    await this.readyPromise;
+    if (!this.db) {
+      throw new Error('Database not initialized');
+    }
     try {
       if (typeof strings === 'string') {
-        // Handle raw string queries
         return await this.db.sql(strings, ...values);
       } else {
-        // Handle tagged template queries
         return await this.db.sql(strings, ...values);
       }
     } catch (err: any) {
-      console.error('SQLiteCloud Error:', err.message);
+      console.error('SQLiteCloud Query Error:', err.message);
       throw err;
+    }
+  }
+
+  async checkConnection(): Promise<boolean> {
+    try {
+      await this.sql`SELECT 1`;
+      return true;
+    } catch (err) {
+      return false;
     }
   }
 

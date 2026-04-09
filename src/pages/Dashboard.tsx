@@ -191,7 +191,7 @@ export default function Dashboard() {
           )}
         </div>
         <div className="flex flex-wrap gap-2">
-          {(user?.role === 'admin' || user?.sector === 'Prospecção') && (
+          {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
             <Link
               to="/leads"
               className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700"
@@ -245,7 +245,7 @@ export default function Dashboard() {
               </button>
             </>
           )}
-          {(user?.role === 'admin' || user?.sector === 'Prospecção') && (
+          {(user?.role === 'admin' || user?.can_use_ai_search === 1) && (
             <Link
               to="/create"
               className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700"
@@ -289,7 +289,7 @@ export default function Dashboard() {
           <div className="space-y-2">
             <p className="text-xs text-zinc-400 uppercase font-bold tracking-wider">Connection String (SQLiteCloud)</p>
             <div className="bg-black p-3 rounded font-mono text-xs break-all border border-zinc-800">
-              sqlitecloud://cmq6frwshz.g4.sqlite.cloud:8860/DsCompany_Prospeccao.db?apikey=Dor8OwUECYmrbcS5vWfsdGpjCpdm9ecSDJtywgvRw8k
+              sqlitecloud://ct9xsnnpvz.g1.sqlite.cloud:8860/DsCompany_com_IA.db?apikey=c9lGTn4sb98t3kl3w2gU8cMXQiKDavSd7QF3vTwHV9Q
             </div>
             <p className="text-xs text-zinc-500 italic">
               * Esta string é usada para conectar o sistema ao banco de dados na nuvem.

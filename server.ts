@@ -1,4 +1,5 @@
 import express from 'express';
+import 'dotenv/config';
 console.log('Server starting...');
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -48,6 +49,21 @@ async function initAdmin() {
 initAdmin();
 
 // --- API Routes ---
+
+// Health check
+app.get('/api/health', async (req, res) => {
+  try {
+    const dbOk = await db.checkConnection();
+    res.json({ 
+      status: 'ok', 
+      database: dbOk ? 'connected' : 'disconnected',
+      timestamp: new Date().toISOString(),
+      env: process.env.NODE_ENV || 'development'
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: 'Health check failed' });
+  }
+});
 
 // Auth Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -267,7 +283,17 @@ app.delete('/api/users/:id', authenticateToken, async (req: any, res) => {
   
   try {
     const userId = parseInt(req.params.id);
+    
+    // Delete associated records first to prevent FOREIGN KEY constraint failed
+    await db.sql`DELETE FROM sites WHERE user_id = ${userId}`;
+    await db.sql`DELETE FROM search_history WHERE user_id = ${userId}`;
+    
+    // Delete the user
     await db.sql`DELETE FROM users WHERE id = ${userId}`;
+    
+    // Clear cache for this user
+    userCache.delete(userId);
+    
     res.json({ success: true });
   } catch (error) {
     console.error('Error deleting user:', error);
@@ -778,7 +804,7 @@ app.post('/api/analyze-link', async (req: any, res: any) => {
   
   if (apiKeyHeader) {
      // Check if it matches a user's API key
-     const results = await db.sql`SELECT id, role, gemini_api_key FROM users WHERE api_key = ${apiKeyHeader}`;
+     const results = await db.sql`SELECT id, role, gemini_api_key, can_use_ai_search FROM users WHERE api_key = ${apiKeyHeader}`;
      const user = results[0];
      if (user) {
        isAuthenticated = true;
@@ -788,7 +814,7 @@ app.post('/api/analyze-link', async (req: any, res: any) => {
      const token = authHeader.split(' ')[1];
      try {
        const decoded: any = jwt.verify(token, JWT_SECRET);
-       const results = await db.sql`SELECT id, role, gemini_api_key FROM users WHERE id = ${decoded.id}`;
+       const results = await db.sql`SELECT id, role, gemini_api_key, can_use_ai_search FROM users WHERE id = ${decoded.id}`;
        const user = results[0];
        if (user) {
          isAuthenticated = true;
@@ -801,6 +827,10 @@ app.post('/api/analyze-link', async (req: any, res: any) => {
 
   if (!isAuthenticated) {
     return res.status(401).json({ error: 'Não autorizado. Forneça um token JWT válido ou um x-api-key configurado.' });
+  }
+
+  if (requestUser.role !== 'admin' && requestUser.can_use_ai_search !== 1) {
+    return res.status(403).json({ error: 'Você não tem permissão para usar recursos de IA. Solicite acesso ao administrador.' });
   }
 
   const { url } = req.body;
@@ -1033,10 +1063,14 @@ app.post('/api/sales/generate-message', authenticateToken, async (req: any, res:
   if (!siteId) return res.status(400).json({ error: 'ID do site é obrigatório' });
 
   try {
-    const userRes = await db.sql`SELECT gemini_api_key, sector FROM users WHERE id = ${req.user.id}`;
+    const userRes = await db.sql`SELECT gemini_api_key, sector, role, can_use_ai_search FROM users WHERE id = ${req.user.id}`;
     const user = userRes[0];
 
-    if (user.sector !== 'Vendas' && req.user.role !== 'admin') {
+    if (user.role !== 'admin' && user.can_use_ai_search !== 1) {
+      return res.status(403).json({ error: 'Você não tem permissão para usar recursos de IA. Solicite acesso ao administrador.' });
+    }
+
+    if (user.sector !== 'Vendas' && user.role !== 'admin') {
       return res.status(403).json({ error: 'Apenas setor de vendas pode gerar mensagens' });
     }
 
@@ -1162,6 +1196,15 @@ const startServer = async () => {
       console.log(`Server running on port ${PORT} (${process.env.NODE_ENV || 'development'} mode)`);
     });
   }
+
+  // Global error handler
+  app.use((err: any, req: any, res: any, next: any) => {
+    console.error('Unhandled Server Error:', err);
+    res.status(500).json({ 
+      error: 'Erro interno no servidor', 
+      message: process.env.NODE_ENV === 'development' ? err.message : 'Ocorreu um erro inesperado.' 
+    });
+  });
 };
 
 startServer();
